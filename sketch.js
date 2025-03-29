@@ -147,14 +147,28 @@ function updateGame() {
     }
   }
   
-  // Spawn obstacles less frequently
-  if (frameCount % 180 === 0) {
+  // Spawn obstacles more frequently (every 2 seconds)
+  if (frameCount % 120 === 0) {
     spawnObstacle();
   }
   
-  // Spawn wall obstacles occasionally
+  // Spawn multiple obstacles every 5 seconds
   if (frameCount % 300 === 0) {
+    for (let i = 0; i < 2; i++) {
+      spawnObstacle();
+    }
+  }
+  
+  // Spawn wall obstacles more frequently (every 4 seconds)
+  if (frameCount % 240 === 0) {
     spawnWall();
+  }
+  
+  // Spawn multiple walls every 8 seconds
+  if (frameCount % 480 === 0) {
+    for (let i = 0; i < 2; i++) {
+      spawnWall();
+    }
   }
 
   // Spawn a new aim every 10 seconds
