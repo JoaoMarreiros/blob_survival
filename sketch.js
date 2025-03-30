@@ -1,4 +1,4 @@
-let player_x, player_y, player_size, energy, score, camera_x, camera_y, scroll_speed, player_speed, animals, aims, aim_transition_speed, gameOver, aim_hit_radius, aim_overlap_time, aim_shoot_delay, start_time, obstacles, fonts, images, playerPulse, playerColor, colors, grassPatches, clouds, walls, last_aim_spawn_time, gameState;
+let player_x, player_y, player_size, energy, score, camera_x, camera_y, scroll_speed, player_speed, animals, aims, aim_transition_speed, gameOver, aim_hit_radius, aim_overlap_time, aim_shoot_delay, start_time, obstacles, fonts, images, playerPulse, playerColor, colors, grassPatches, clouds, walls, last_aim_spawn_time, gameState, highScores = [], nameInput = "", isNewHighScore = false;
 
 function preload() {
   // Loading custom font for futuristic look
@@ -12,7 +12,10 @@ function setup() {
   frameRate(60);
   
   // Game state
-  gameState = "INTRO"; // Can be "INTRO", "PLAYING", or "GAME_OVER"
+  gameState = "INTRO"; // Can be "INTRO", "PLAYING", "GAME_OVER", "ENTER_NAME", or "VIEW_SCORES"
+  
+  // Load high scores from localStorage
+  loadHighScores();
   
   // Color palette for AI theme
   colors = {
@@ -26,7 +29,8 @@ function setup() {
     gameOverBg: color(5, 10, 20, 220),    // Dark overlay for game over
     buttonBg: color(30, 80, 130),         // Button background
     buttonHover: color(40, 120, 180),     // Button hover state
-    buttonText: color(220, 255, 240)      // Button text
+    buttonText: color(220, 255, 240),     // Button text
+    scoreTable: color(15, 30, 60, 200)    // Score table background
   };
   
   resetGame();
@@ -105,13 +109,25 @@ function draw() {
     drawIntroScreen();
   } else if (gameState === "PLAYING") {
     if (gameOver) {
-      gameState = "GAME_OVER";
+      // Check if current score is a high score
+      isNewHighScore = checkHighScore(score);
+      if (isNewHighScore) {
+        gameState = "ENTER_NAME";
+        nameInput = ""; // Reset name input
+      } else {
+        gameState = "GAME_OVER";
+      }
+    } else {
+      updateGame();
+      drawGameWorld();
+      drawUI();
     }
-    updateGame();
-    drawGameWorld();
-    drawUI();
   } else if (gameState === "GAME_OVER") {
     drawGameOver();
+  } else if (gameState === "ENTER_NAME") {
+    drawEnterNameScreen();
+  } else if (gameState === "VIEW_SCORES") {
+    drawViewScoresScreen();
   }
 }
 
@@ -838,58 +854,144 @@ function drawIntroScreen() {
   pop();
   
   // Draw start button
-  let buttonX = width/2;
-  let buttonY = height * 0.75;
+  let startButtonX = width/2;
+  let startButtonY = height * 0.68;
   let buttonWidth = 200;
   let buttonHeight = 50;
   
-  // Check if mouse is over button
-  let mouseOverButton = 
-    mouseX > buttonX - buttonWidth/2 && 
-    mouseX < buttonX + buttonWidth/2 && 
-    mouseY > buttonY - buttonHeight/2 && 
-    mouseY < buttonY + buttonHeight/2;
+  // Check if mouse is over start button
+  let mouseOverStartButton = 
+    mouseX > startButtonX - buttonWidth/2 && 
+    mouseX < startButtonX + buttonWidth/2 && 
+    mouseY > startButtonY - buttonHeight/2 && 
+    mouseY < startButtonY + buttonHeight/2;
   
   // Button background with hover effect
-  fill(mouseOverButton ? colors.buttonHover : colors.buttonBg);
-  rect(buttonX - buttonWidth/2, buttonY - buttonHeight/2, buttonWidth, buttonHeight, 10);
+  fill(mouseOverStartButton ? colors.buttonHover : colors.buttonBg);
+  rect(startButtonX - buttonWidth/2, startButtonY - buttonHeight/2, buttonWidth, buttonHeight, 10);
   
   // Button glow when hovering
-  if (mouseOverButton) {
+  if (mouseOverStartButton) {
     noFill();
     stroke(colors.playerCore);
     strokeWeight(2);
-    rect(buttonX - buttonWidth/2 - 3, buttonY - buttonHeight/2 - 3, buttonWidth + 6, buttonHeight + 6, 12);
+    rect(startButtonX - buttonWidth/2 - 3, startButtonY - buttonHeight/2 - 3, buttonWidth + 6, buttonHeight + 6, 12);
     noStroke();
   }
   
   // Button text
   fill(colors.buttonText);
   textSize(22);
-  text("START GAME", buttonX, buttonY + 2);
+  text("START GAME", startButtonX, startButtonY + 2);
+  
+  // Draw high scores button
+  let scoresButtonX = width/2;
+  let scoresButtonY = height * 0.82;
+  
+  // Check if mouse is over high scores button
+  let mouseOverScoresButton = 
+    mouseX > scoresButtonX - buttonWidth/2 && 
+    mouseX < scoresButtonX + buttonWidth/2 && 
+    mouseY > scoresButtonY - buttonHeight/2 && 
+    mouseY < scoresButtonY + buttonHeight/2;
+  
+  // Button background with hover effect
+  fill(mouseOverScoresButton ? colors.buttonHover : colors.buttonBg);
+  rect(scoresButtonX - buttonWidth/2, scoresButtonY - buttonHeight/2, buttonWidth, buttonHeight, 10);
+  
+  // Button glow when hovering
+  if (mouseOverScoresButton) {
+    noFill();
+    stroke(colors.playerCore);
+    strokeWeight(2);
+    rect(scoresButtonX - buttonWidth/2 - 3, scoresButtonY - buttonHeight/2 - 3, buttonWidth + 6, buttonHeight + 6, 12);
+    noStroke();
+  }
+  
+  // Button text
+  fill(colors.buttonText);
+  textSize(22);
+  text("HIGH SCORES", scoresButtonX, scoresButtonY + 2);
   
   // Draw small decorative elements
   fill(colors.aim);
-  rect(width/2 - 100, height * 0.75 + 40, 30, 2);
-  rect(width/2 - 80, height * 0.75 + 40, 10, 2);
+  rect(width/2 - 100, height * 0.85, 30, 2);
+  rect(width/2 - 80, height * 0.85, 10, 2);
   
   fill(colors.player);
-  rect(width/2 + 70, height * 0.75 + 40, 10, 2);
-  rect(width/2 + 90, height * 0.75 + 40, 30, 2);
+  rect(width/2 + 70, height * 0.85, 10, 2);
+  rect(width/2 + 90, height * 0.85, 30, 2);
   
   // Draw controls info
   textSize(16);
   fill(colors.uiText);
-  text("ARROW KEYS TO MOVE", width/2, height - 40);
+  text("ARROW KEYS TO MOVE", width/2, height - 30);
 }
 
 function mousePressed() {
   if (gameState === "INTRO") {
-    // Check if start button is clicked
-    let buttonX = width/2;
-    let buttonY = height * 0.75;
+    // Define button dimensions
     let buttonWidth = 200;
     let buttonHeight = 50;
+    
+    // Start button
+    let startButtonX = width/2;
+    let startButtonY = height * 0.68;
+    
+    if (
+      mouseX > startButtonX - buttonWidth/2 && 
+      mouseX < startButtonX + buttonWidth/2 && 
+      mouseY > startButtonY - buttonHeight/2 && 
+      mouseY < startButtonY + buttonHeight/2
+    ) {
+      // Start the game
+      resetGame();
+      gameState = "PLAYING";
+      return;
+    }
+    
+    // High scores button
+    let scoresButtonX = width/2;
+    let scoresButtonY = height * 0.82;
+    
+    if (
+      mouseX > scoresButtonX - buttonWidth/2 && 
+      mouseX < scoresButtonX + buttonWidth/2 && 
+      mouseY > scoresButtonY - buttonHeight/2 && 
+      mouseY < scoresButtonY + buttonHeight/2
+    ) {
+      // View high scores
+      gameState = "VIEW_SCORES";
+      return;
+    }
+  } else if (gameState === "GAME_OVER") {
+    // Return to intro screen on click
+    gameState = "INTRO";
+  } else if (gameState === "ENTER_NAME") {
+    // Check if submit button is clicked
+    let buttonWidth = 150;
+    let buttonHeight = 40;
+    let buttonX = width / 2 - buttonWidth / 2;
+    let buttonY = height / 2 + 60;
+    
+    if (
+      mouseX > buttonX && 
+      mouseX < buttonX + buttonWidth && 
+      mouseY > buttonY && 
+      mouseY < buttonY + buttonHeight
+    ) {
+      // Submit name
+      if (nameInput.trim().length > 0) {
+        addHighScore(nameInput.trim(), score);
+        gameState = "GAME_OVER";
+      }
+    }
+  } else if (gameState === "VIEW_SCORES") {
+    // Back button
+    let buttonWidth = 180;
+    let buttonHeight = 50;
+    let buttonX = width/2;
+    let buttonY = height * 0.85;
     
     if (
       mouseX > buttonX - buttonWidth/2 && 
@@ -897,13 +999,9 @@ function mousePressed() {
       mouseY > buttonY - buttonHeight/2 && 
       mouseY < buttonY + buttonHeight/2
     ) {
-      // Start the game
-      resetGame();
-      gameState = "PLAYING";
+      // Return to menu
+      gameState = "INTRO";
     }
-  } else if (gameState === "GAME_OVER") {
-    // Return to intro screen on click
-    gameState = "INTRO";
   }
 }
 
@@ -919,18 +1017,210 @@ function drawGameOver() {
   fill(colors.aim);
   textSize(40);
   textAlign(CENTER, CENTER);
-  text("SIMULATION TERMINATED", width / 2, height / 2 - 50);
+  text("SIMULATION TERMINATED", width / 2, height / 5);
   
   fill(colors.player);
   textSize(24);
-  text("ALIEN SURVIVAL: " + score + " SECONDS", width / 2, height / 2 + 10);
+  text("ALIEN SURVIVAL: " + score + " SECONDS", width / 2, height / 5 + 50);
+  
+  // Draw high scores table
+  drawHighScoresTable();
   
   // Restart prompt with blinking effect
   if (frameCount % 60 < 40) {
     fill(colors.uiText);
     textSize(16);
-    text("CLICK ANYWHERE TO RETURN TO MENU", width / 2, height / 2 + 80);
+    text("CLICK ANYWHERE TO RETURN TO MENU", width / 2, height - 40);
   }
+}
+
+function drawHighScoresTable() {
+  // Table background
+  fill(colors.scoreTable);
+  rect(width/2 - 180, height/5 + 90, 360, 240, 10);
+  
+  // Table title
+  fill(colors.playerCore);
+  textSize(22);
+  textAlign(CENTER);
+  text("TOP SURVIVAL RECORDS", width/2, height/5 + 120);
+  
+  // Table headers
+  fill(colors.uiText);
+  textSize(14);
+  textAlign(LEFT);
+  text("RANK", width/2 - 160, height/5 + 150);
+  textAlign(CENTER);
+  text("NAME", width/2, height/5 + 150);
+  textAlign(RIGHT);
+  text("SCORE", width/2 + 160, height/5 + 150);
+  
+  // Horizontal line
+  stroke(colors.uiText);
+  strokeWeight(1);
+  line(width/2 - 160, height/5 + 160, width/2 + 160, height/5 + 160);
+  noStroke();
+  
+  // Check if we have any high scores
+  if (highScores.length === 0) {
+    fill(colors.uiText);
+    textSize(16);
+    textAlign(CENTER);
+    text("NO RECORDS YET", width/2, height/5 + 200);
+    return;
+  }
+  
+  // Draw table rows
+  for (let i = 0; i < highScores.length && i < 10; i++) {
+    let yPos = height/5 + 180 + i * 22;
+    
+    fill(colors.uiText);
+    textAlign(LEFT);
+    text("#" + (i + 1), width/2 - 160, yPos);
+    
+    textAlign(CENTER);
+    text(highScores[i].name, width/2, yPos);
+    
+    textAlign(RIGHT);
+    text(highScores[i].score + "s", width/2 + 160, yPos);
+  }
+}
+
+function drawEnterNameScreen() {
+  // Background
+  background(colors.background);
+  
+  // Semi-transparent overlay
+  fill(colors.gameOverBg);
+  rect(0, 0, width, height);
+  
+  // High score congratulatory text
+  fill(colors.playerCore);
+  textSize(30);
+  textAlign(CENTER, CENTER);
+  text("NEW HIGH SCORE: " + score + " SECONDS!", width / 2, height / 4);
+  
+  // Name input prompt
+  fill(colors.uiText);
+  textSize(20);
+  text("ENTER YOUR NAME:", width / 2, height / 2 - 40);
+  
+  // Name input field
+  let inputFieldWidth = 300;
+  let inputFieldHeight = 40;
+  let inputFieldX = width / 2 - inputFieldWidth / 2;
+  let inputFieldY = height / 2;
+  
+  // Input field background
+  fill(30, 60, 100);
+  rect(inputFieldX, inputFieldY, inputFieldWidth, inputFieldHeight, 5);
+  
+  // Input field text
+  fill(colors.uiText);
+  textSize(18);
+  textAlign(LEFT, CENTER);
+  text(nameInput + (frameCount % 60 < 30 ? "|" : ""), inputFieldX + 10, inputFieldY + inputFieldHeight/2);
+  
+  // Submit button
+  let buttonWidth = 150;
+  let buttonHeight = 40;
+  let buttonX = width / 2 - buttonWidth / 2;
+  let buttonY = height / 2 + 60;
+  
+  // Button background
+  fill(colors.buttonBg);
+  rect(buttonX, buttonY, buttonWidth, buttonHeight, 5);
+  
+  // Button text
+  fill(colors.uiText);
+  textSize(16);
+  textAlign(CENTER, CENTER);
+  text("SUBMIT", width / 2, buttonY + buttonHeight / 2);
+  
+  // Instructions
+  fill(colors.uiText);
+  textSize(14);
+  text("Press ENTER to submit", width / 2, height / 2 + 120);
+}
+
+// Load high scores from localStorage
+function loadHighScores() {
+  let savedScores = localStorage.getItem('alienBlobHighScores');
+  if (savedScores) {
+    highScores = JSON.parse(savedScores);
+  } else {
+    highScores = [];
+  }
+}
+
+// Save high scores to localStorage
+function saveHighScores() {
+  localStorage.setItem('alienBlobHighScores', JSON.stringify(highScores));
+}
+
+// Check if current score is a high score
+function checkHighScore(playerScore) {
+  if (highScores.length < 10) {
+    return true; // Automatically a high score if we have fewer than 10 scores
+  }
+  
+  // Get the lowest score in the top 10
+  let lowestHighScore = highScores[highScores.length - 1].score;
+  
+  return playerScore > lowestHighScore;
+}
+
+// Add a new high score to the list
+function addHighScore(name, playerScore) {
+  // Add new score to the array
+  highScores.push({
+    name: name,
+    score: playerScore,
+    date: new Date().toLocaleDateString()
+  });
+  
+  // Sort the array by score in descending order
+  highScores.sort((a, b) => b.score - a.score);
+  
+  // Keep only the top 10
+  if (highScores.length > 10) {
+    highScores = highScores.slice(0, 10);
+  }
+  
+  // Save to localStorage
+  saveHighScores();
+}
+
+// Add keyboard input for name entry
+function keyPressed() {
+  if (gameState === "ENTER_NAME") {
+    if (keyCode === ENTER) {
+      // Submit name
+      if (nameInput.trim().length > 0) {
+        addHighScore(nameInput.trim(), score);
+        gameState = "GAME_OVER";
+      }
+    } else if (keyCode === BACKSPACE) {
+      // Remove last character
+      nameInput = nameInput.slice(0, -1);
+      return false; // Prevent default behavior
+    }
+  }
+  return true;
+}
+
+function keyTyped() {
+  if (gameState === "ENTER_NAME") {
+    // Max name length is 15 characters
+    if (nameInput.length < 15) {
+      // Only allow letters, numbers, and spaces
+      if (/[a-zA-Z0-9 ]/.test(key)) {
+        nameInput += key;
+      }
+    }
+    return false; // Prevent default behavior
+  }
+  return true;
 }
 
 function spawnWall() {
@@ -1062,4 +1352,122 @@ function updateAims() {
       aim.overlap_time = 0;
     }
   }
+}
+
+// Add a new function to display high scores from menu
+function drawViewScoresScreen() {
+  // Background with starry effect
+  background(colors.background);
+  
+  // Draw stars
+  fill(255, 200);
+  for (let i = 0; i < 70; i++) {
+    let starX = (i * 200 + frameCount * 0.1) % width;
+    let starY = (i * 150 + sin(frameCount * 0.01 + i) * 10) % height;
+    let starSize = random(1, 3);
+    ellipse(starX, starY, starSize);
+    
+    // Add twinkling effect to some stars
+    if (i % 5 === 0) {
+      let pulse = sin(frameCount * 0.1 + i) * 2;
+      ellipse(starX, starY, starSize + pulse);
+    }
+  }
+  
+  // Title
+  fill(colors.playerCore);
+  textSize(40);
+  textAlign(CENTER, CENTER);
+  text("HIGH SCORES", width/2, height/6);
+  
+  // Draw high scores table
+  // Table background
+  fill(colors.scoreTable);
+  rect(width/2 - 200, height/6 + 60, 400, 280, 10);
+  
+  // Table title
+  fill(colors.playerCore);
+  textSize(22);
+  textAlign(CENTER);
+  text("TOP SURVIVAL RECORDS", width/2, height/6 + 90);
+  
+  // Table headers
+  fill(colors.uiText);
+  textSize(16);
+  textAlign(LEFT);
+  text("RANK", width/2 - 170, height/6 + 130);
+  textAlign(CENTER);
+  text("NAME", width/2, height/6 + 130);
+  textAlign(RIGHT);
+  text("SCORE", width/2 + 170, height/6 + 130);
+  
+  // Horizontal line
+  stroke(colors.uiText);
+  strokeWeight(1);
+  line(width/2 - 170, height/6 + 140, width/2 + 170, height/6 + 140);
+  noStroke();
+  
+  // Check if we have any high scores
+  if (highScores.length === 0) {
+    fill(colors.uiText);
+    textSize(20);
+    textAlign(CENTER);
+    text("NO RECORDS YET", width/2, height/2);
+  } else {
+    // Draw table rows
+    for (let i = 0; i < highScores.length && i < 10; i++) {
+      let yPos = height/6 + 170 + i * 25;
+      
+      fill(colors.uiText);
+      textAlign(LEFT);
+      text("#" + (i + 1), width/2 - 170, yPos);
+      
+      textAlign(CENTER);
+      text(highScores[i].name, width/2, yPos);
+      
+      textAlign(RIGHT);
+      text(highScores[i].score + "s", width/2 + 170, yPos);
+    }
+  }
+  
+  // Back button
+  let buttonX = width/2;
+  let buttonY = height * 0.85;
+  let buttonWidth = 180;
+  let buttonHeight = 50;
+  
+  // Check if mouse is over button
+  let mouseOverButton = 
+    mouseX > buttonX - buttonWidth/2 && 
+    mouseX < buttonX + buttonWidth/2 && 
+    mouseY > buttonY - buttonHeight/2 && 
+    mouseY < buttonY + buttonHeight/2;
+  
+  // Button background with hover effect
+  fill(mouseOverButton ? colors.buttonHover : colors.buttonBg);
+  rect(buttonX - buttonWidth/2, buttonY - buttonHeight/2, buttonWidth, buttonHeight, 10);
+  
+  // Button glow when hovering
+  if (mouseOverButton) {
+    noFill();
+    stroke(colors.playerCore);
+    strokeWeight(2);
+    rect(buttonX - buttonWidth/2 - 3, buttonY - buttonHeight/2 - 3, buttonWidth + 6, buttonHeight + 6, 12);
+    noStroke();
+  }
+  
+  // Button text
+  fill(colors.buttonText);
+  textSize(20);
+  textAlign(CENTER, CENTER);
+  text("BACK TO MENU", buttonX, buttonY);
+  
+  // Draw small decorative elements
+  fill(colors.aim);
+  rect(width/2 - 90, buttonY + 40, 30, 2);
+  rect(width/2 - 50, buttonY + 40, 10, 2);
+  
+  fill(colors.player);
+  rect(width/2 + 40, buttonY + 40, 10, 2);
+  rect(width/2 + 60, buttonY + 40, 30, 2);
 }
